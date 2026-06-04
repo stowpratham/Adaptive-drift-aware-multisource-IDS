@@ -24,16 +24,31 @@ import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
+# ─── WINDOWS CRASH FIX: Disable parallelism ──────────────
+# Access violation (0xC0000005) occurs in parallel SHAP + KNN on Windows
+# Force single-threaded execution across all libraries
+import os
+os.environ["NUMBA_DISABLE_JIT"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+import joblib
+joblib.parallel_backend('sequential')
+
 import numpy as np
 import pandas as pd
 import matplotlib
+matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+plt.ioff()
 import matplotlib.patches as mpatches
 import seaborn as sns
-import os
 import time
+import json
+import logging
 from collections import deque
+from typing import Optional
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import SGDClassifier, Perceptron
@@ -55,6 +70,10 @@ import torch
 import torch.nn as nn
 torch.manual_seed(42)
 
+from preprocessing.feature_names import default_latent_feature_names
+from xai.explanation_service import ExplanationService, configure_explanation_service
+from xai.visualization import close_all_figures
+
 # ─────────────────────────────────────────────────────────
 # CONSTANTS
 # ─────────────────────────────────────────────────────────
@@ -74,6 +93,12 @@ DRIFT_THRESH   = 0.05       # error rate threshold to trigger retraining
 LATENT_DIM     = 32         # shared latent space dimensionality
 RANDOM_STATE   = 42
 np.random.seed(RANDOM_STATE)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+logger = logging.getLogger("ids_pipeline")
 
 # ─────────────────────────────────────────────────────────
 # UTILITY: pretty section headers
@@ -412,10 +437,10 @@ class AdaptiveEnsemble:
 
     def __init__(self):
         self.batch_models = {
-            "RandomForest"     : RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1),
+            "RandomForest"     : RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=1),
             "GradientBoosting" : GradientBoostingClassifier(n_estimators=80, random_state=RANDOM_STATE),
             "DecisionTree"     : DecisionTreeClassifier(max_depth=12, random_state=RANDOM_STATE),
-            "KNN"              : KNeighborsClassifier(n_neighbors=5, n_jobs=-1),
+            "KNN"              : KNeighborsClassifier(n_neighbors=5, n_jobs=1),
         }
         self.stream_models = {
             "SGD_Hinge"        : SGDClassifier(loss="hinge",    max_iter=1, warm_start=True, random_state=RANDOM_STATE),
@@ -975,6 +1000,21 @@ def main():
     drift_det = DriftDetector()
     print(f"  DriftDetector: window={DRIFT_WINDOW}, threshold={DRIFT_THRESH}")
 
+    # 11B. XAI service initialization (SHAP over RandomForest on fused latent features)
+    section("STEP 7B ▸ Initializing Explainable AI (SHAP)")
+    latent_feature_names = default_latent_feature_names(X_train_bal.shape[1])
+    xai_service = ExplanationService(
+        ensemble=ensemble,
+        background_data=X_train_bal,
+        feature_names=latent_feature_names,
+        output_dir=os.path.join(BASE_DIR, "results", "explainability"),
+        top_k_features=5,
+        save_plots_on_explain=False,
+    )
+    configure_explanation_service(xai_service)
+    xai_service.generate_global_explanations(X_train_bal)
+    logger.info("XAI service ready; global SHAP visualizations saved.")
+
     # ══════════════════════════════════════════════════════
     # 12. Prepare UNSW test stream for drift simulation
     #     Model is trained ONLY on KDD latent representations.
@@ -1020,13 +1060,32 @@ def main():
     chunk_df, drift_points = stream_evaluate(
         ensemble, anomaly_det, drift_det,
         X_drift_stream, y_drift_stream,   # use REAL labels for drift evaluation
-        X_train_bal, y_train_bal
+        X_train_bal, y_train_bal,
     )
+
+    section("STEP 10B ▸ Selective Stream Explainability (SHAP)")
+
+    explain_payload = xai_service.generate_stream_explanations(
+        X_stream=X_drift_stream,
+        drift_chunk_ids=drift_points,
+        chunk_size=STREAM_CHUNK,
+    )
+
+    explain_path = os.path.join(BASE_DIR, "results", "explainability", "prediction_explanations.json")
+    print(
+        f"  Explained samples : {explain_payload['metadata']['explained_samples']}"
+        f" / {explain_payload['metadata']['stream_samples']}"
+    )
+    print(
+        f"  Visualization files: {explain_payload['metadata']['visualization_file_count']}"
+        f" / {explain_payload['metadata']['visualization_file_limit']}"
+    )
+    print(f"  Prediction explanations JSON: {explain_path}")
 
     # 16. Final evaluation (using real UNSW labels for ground truth)
     results = final_evaluation(ensemble, anomaly_det,
                                X_drift_stream, y_drift_stream, le_target)
-
+    print("D: Final evaluation complete")
     # 17. Plots
     plot_all(chunk_df, drift_points, results,
              y_kdd_train, X_train_bal, y_train_bal, ensemble)
@@ -1035,6 +1094,8 @@ def main():
     metrics_path = os.path.join(OUT_DIR, "stream_metrics.csv")
     chunk_df.to_csv(metrics_path, index=False)
     print(f"\n  Stream metrics CSV: {metrics_path}")
+
+    close_all_figures()
 
     elapsed = time.time() - t_start
     print(f"\n{'█'*60}")
@@ -1049,14 +1110,14 @@ if __name__ == "__main__":
     main()
 
     folder_path = os.path.abspath(OUT_DIR)
-    if os.path.exists(folder_path):
-        for file in os.listdir(folder_path):
-            if file.endswith(".png"):
-                file_path = os.path.join(folder_path, file)
-                try:
-                    os.startfile(file_path)
-                except AttributeError:
-                    import subprocess
-                    subprocess.call(["xdg-open", file_path])
-    else:
-        print("models folder not found")
+    ##if os.path.exists(folder_path):
+        ##for file in os.listdir(folder_path):
+            #if file.endswith(".png"):
+                #file_path = os.path.join(folder_path, file)
+                #try:
+                    #os.startfile(file_path)
+                #except AttributeError:
+                    #import subprocess
+                    #subprocess.call(["xdg-open", file_path])
+    ##else:
+        #print("models folder not found")
