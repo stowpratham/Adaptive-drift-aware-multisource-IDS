@@ -147,34 +147,26 @@
     "visualization_files": [
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\global_feature_importance.png",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\shap_summary.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_187_idx_291.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_187_idx_291.html",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_138_idx_212.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_138_idx_212.html",
+      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_309_idx_129.png",
+      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_263_idx_499.png",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_120_idx_484.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_120_idx_484.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_60_idx_171.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_60_idx_171.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_0.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_1_idx_0.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_499.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_1_idx_499.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_2_idx_0.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_2_idx_0.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_3_idx_499.png",
-      "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_3_idx_499.html",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_4_idx_0.png",
       "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_4_idx_499.png"
     ],
-    "visualization_file_count": 20,
+    "visualization_file_count": 12,
     "visualization_file_limit": 20
   },
   "explanations": [
     {
-      "sample_id": "chunk_187_idx_291",
-      "global_index": 93291,
-      "chunk_index": 187,
-      "chunk_local_index": 291,
+      "sample_id": "chunk_309_idx_129",
+      "global_index": 154129,
+      "chunk_index": 309,
+      "chunk_local_index": 129,
       "selection_reason": "top_attack",
       "prediction": "attack",
       "prediction_display": "Malicious / Attack",
@@ -295,15 +287,14 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_187_idx_291.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_187_idx_291.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_309_idx_129.png"
       }
     },
     {
-      "sample_id": "chunk_138_idx_212",
-      "global_index": 68712,
-      "chunk_index": 138,
-      "chunk_local_index": 212,
+      "sample_id": "chunk_263_idx_499",
+      "global_index": 131499,
+      "chunk_index": 263,
+      "chunk_local_index": 499,
       "selection_reason": "top_attack",
       "prediction": "attack",
       "prediction_display": "Malicious / Attack",
@@ -424,8 +415,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_138_idx_212.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_138_idx_212.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_263_idx_499.png"
       }
     },
     {
@@ -553,8 +543,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_120_idx_484.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_120_idx_484.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_120_idx_484.png"
       }
     },
     {
@@ -682,8 +671,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_60_idx_171.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_60_idx_171.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_60_idx_171.png"
       }
     },
     {
@@ -811,8 +799,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_0.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_1_idx_0.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_0.png"
       }
     },
     {
@@ -940,8 +927,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_499.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_1_idx_499.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_1_idx_499.png"
       }
     },
     {
@@ -1069,8 +1055,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_2_idx_0.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_2_idx_0.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_2_idx_0.png"
       }
     },
     {
@@ -1198,8 +1183,7 @@
       "model_explained": "RandomForest",
       "feature_space": "fused_latent_32d",
       "plots": {
-        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_3_idx_499.png",
-        "force": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\force_chunk_3_idx_499.html"
+        "waterfall": "C:\\Users\\prath\\Desktop\\IDS_MP\\Adaptive-drift-intrusion-detection\\results\\explainability\\waterfall_chunk_3_idx_499.png"
       }
     },
     {
