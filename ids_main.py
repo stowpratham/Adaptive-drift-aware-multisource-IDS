@@ -22,6 +22,8 @@ warnings.filterwarnings("ignore")
 
 import sys
 import io
+import os
+import joblib
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # ─── WINDOWS CRASH FIX: Disable parallelism ──────────────
@@ -1049,6 +1051,18 @@ def main():
     X_drift_stream, y_drift_stream = create_drift_stream(
         fused_unsw_test, y_unsw_test_unified
     )
+
+  
+    # Export datasets for baseline comparison
+    os.makedirs("baselines/data", exist_ok=True)
+
+    joblib.dump(X_train_bal, "baselines/data/X_train_bal.pkl")
+    joblib.dump(y_train_bal, "baselines/data/y_train_bal.pkl")
+
+    joblib.dump(X_drift_stream, "baselines/data/X_drift_stream.pkl")
+    joblib.dump(y_drift_stream, "baselines/data/y_drift_stream.pkl")
+
+    print("✓ Baseline datasets exported")
 
     # 14. Pseudo-label the stream data
     #     Even though UNSW test has real labels, pseudo-labeling
