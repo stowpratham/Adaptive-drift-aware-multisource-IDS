@@ -17,6 +17,7 @@ from dashboard.utils.data_loader import (
 
 
 def render() -> None:
+    st.write("DEBUG: Stream Monitor Loaded")
     st.title("Stream Monitoring")
     stream_df = load_stream_metrics()
     if stream_df is None:

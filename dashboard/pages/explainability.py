@@ -9,6 +9,7 @@ from dashboard.utils.data_loader import load_prediction_explanations, load_shap_
 
 
 def render() -> None:
+    st.write("DEBUG: Stream Monitor Loaded")
     st.title("Explainable AI")
     shap_assets = load_shap_assets()
     render_shap_panel(shap_assets.get("summary"), shap_assets.get("importance"))

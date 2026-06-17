@@ -9,7 +9,7 @@ import streamlit as st
 def render_shap_panel(summary_path: Optional[str], importance_path: Optional[str]) -> None:
     st.subheader("Global Explainability")
     if summary_path:
-        st.image(summary_path, caption="SHAP Summary", use_column_width=True)
+        st.image(summary_path, caption="SHAP Summary", width="stretch")
     else:
         st.warning("SHAP summary plot not found.")
 
@@ -54,7 +54,7 @@ def render_sample_explanation(record: Dict[str, any], waterfall_files: List[str]
         for plot_type, path in plot_files.items():
             if Path(path).exists():
                 if path.endswith(".png"):
-                    st.image(path, caption=f"{plot_type.title()} Plot", use_column_width=True)
+                    st.image(path, caption=f"{plot_type.title()} Plot", use_column_width="stretch")
                 elif path.endswith(".html"):
                     st.markdown(f"[{plot_type.title()} plot]({Path(path).as_uri()})")
     elif waterfall_files or force_files:

@@ -15,15 +15,9 @@ from dashboard.utils.helpers import system_health_status, summary_to_display
 from dashboard.utils.model_loader import get_model_status
 
 
-def render() -> None:
-    st.title("System Overview")
-    all_present, missing = check_required_outputs()
-    if not all_present:
-        st.warning(
-            "Required IDS outputs are missing. Run `ids_main.py` first to generate the latest stream metrics and explainability artifacts."
-        )
-        st.info("Missing files: " + ", ".join(missing))
-
+def render():
+    st.title("Overview Test")
+    st.success("Overview page works!")
     summary_metrics = parse_summary_metrics()
     summary_cards = summary_to_display(summary_metrics)
     phase_stats = parse_phase_distribution()
