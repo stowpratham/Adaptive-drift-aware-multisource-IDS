@@ -50,3 +50,7 @@ def render() -> None:
                 f"Phase {index}: {phase['samples']:,} records — "
                 f"{phase['attack']:,} attack, {phase['normal']:,} benign"
             )
+
+
+if __name__ == "__main__":
+    render()

@@ -72,8 +72,8 @@ import torch
 import torch.nn as nn
 torch.manual_seed(42)
 
-from preprocessing.feature_names import default_latent_feature_names
 from xai.explanation_service import ExplanationService, configure_explanation_service
+from xai.latent_mapping import build_latent_feature_mapping, save_latent_feature_mapping
 from xai.visualization import close_all_figures
 
 # ─────────────────────────────────────────────────────────
@@ -101,7 +101,6 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 logger = logging.getLogger("ids_pipeline")
-
 # ─────────────────────────────────────────────────────────
 # UTILITY: pretty section headers
 # ─────────────────────────────────────────────────────────
@@ -599,6 +598,11 @@ def stream_evaluate(ensemble, anomaly_det, drift_det,
         # Combine: if either flags it, mark as anomaly (1)
         hybrid_pred = np.clip(ml_pred + anom_pred, 0, 1)
 
+            # --- Chunk class distribution ---
+        total_samples = len(y_chunk)
+        attack_samples = int(np.sum(y_chunk == 1))
+        normal_samples = int(np.sum(y_chunk == 0))
+
         # --- Metrics ---
         acc  = accuracy_score(y_chunk, hybrid_pred)
         prec = precision_score(y_chunk, hybrid_pred, zero_division=0)
@@ -606,10 +610,15 @@ def stream_evaluate(ensemble, anomaly_det, drift_det,
         f1   = f1_score(y_chunk, hybrid_pred,        zero_division=0)
 
         chunk_metrics.append({
-            "chunk": i + 1, "accuracy": acc,
-            "precision": prec, "recall": rec, "f1": f1
+            "chunk": i + 1,
+            "total_samples": total_samples,
+            "normal_samples": normal_samples,
+            "attack_samples": attack_samples,
+            "accuracy": acc,
+            "precision": prec,
+            "recall": rec,
+            "f1": f1
         })
-
         # --- Drift detection ---
         drifted, err_rate = drift_det.update(y_chunk, hybrid_pred, i + 1)
         if drifted:
@@ -919,6 +928,16 @@ def main():
     kdd_ae = AutoEncoder(input_dim=kdd_input_dim, latent_dim=LATENT_DIM)
     kdd_encoder = train_encoder(kdd_ae, X_kdd_train_sc, epochs=30)
 
+    mapping_output_dir = os.path.join(BASE_DIR, "results", "explainability")
+    os.makedirs(mapping_output_dir, exist_ok=True)
+    latent_mapping = build_latent_feature_mapping(
+        encoder=kdd_encoder,
+        original_feature_names=X_kdd_train.columns,
+        top_k=3,
+    )
+    mapping_path = save_latent_feature_mapping(latent_mapping, mapping_output_dir)
+    print(f"  Latent feature mapping saved: {mapping_path}")
+
     print(f"  Training UNSW autoencoder ({unsw_input_dim} → 64 → {LATENT_DIM} → 64 → {unsw_input_dim}) ...")
     unsw_ae = AutoEncoder(input_dim=unsw_input_dim, latent_dim=LATENT_DIM)
     unsw_encoder = train_encoder(unsw_ae, X_unsw_train_sc, epochs=30)
@@ -1004,14 +1023,16 @@ def main():
 
     # 11B. XAI service initialization (SHAP over RandomForest on fused latent features)
     section("STEP 7B ▸ Initializing Explainable AI (SHAP)")
-    latent_feature_names = default_latent_feature_names(X_train_bal.shape[1])
+    mapping_output_dir = os.path.join(BASE_DIR, "results", "explainability")
+    latent_feature_names = [item["display_label"] for item in latent_mapping]
     xai_service = ExplanationService(
         ensemble=ensemble,
         background_data=X_train_bal,
         feature_names=latent_feature_names,
-        output_dir=os.path.join(BASE_DIR, "results", "explainability"),
+        output_dir=mapping_output_dir,
         top_k_features=5,
         save_plots_on_explain=False,
+        latent_feature_mapping=latent_mapping,
     )
     configure_explanation_service(xai_service)
     xai_service.generate_global_explanations(X_train_bal)

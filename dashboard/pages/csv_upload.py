@@ -71,3 +71,7 @@ def render() -> None:
         "At present, this dashboard loads existing trained model artifacts only. "
         "If inference is implemented with serialized models, predictions will appear here."
     )
+
+
+if __name__ == "__main__":
+    render()

@@ -16,3 +16,18 @@ models/*.csv
 
 # Logs
 *.log
+
+# Python virtual environments
+.venv/
+.venv311/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example

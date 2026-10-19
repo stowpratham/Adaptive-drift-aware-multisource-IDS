@@ -9,26 +9,29 @@ import pandas as pd
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BASE_DIR = PROJECT_ROOT
-MODEL_DIR = BASE_DIR / "models"
-RESULTS_DIR = BASE_DIR / "results"
+RESULTS_DIR = PROJECT_ROOT / "results"
+BASELINES_DIR = RESULTS_DIR / "baselines"
 EXPLAIN_DIR = RESULTS_DIR / "explainability"
-LOG_PATHS = [BASE_DIR / "output_fixed.log", BASE_DIR / "output.log"]
-METRICS_PATHS = [MODEL_DIR / "stream_metrics.csv", BASE_DIR / "stream_metrics.csv"]
-SHAP_FILES = {
-    "summary": EXPLAIN_DIR / "shap_summary.png",
-    "importance": EXPLAIN_DIR / "global_feature_importance.png",
-}
-
+LOG_PATHS = [PROJECT_ROOT / "output_fixed.log", PROJECT_ROOT / "output.log"]
+METRICS_PATHS = [PROJECT_ROOT / "models" / "stream_metrics.csv", PROJECT_ROOT / "stream_metrics.csv"]
 
 def _safe_read_text(path: Path) -> Optional[str]:
-    if not path.exists():
-        return None
-    for encoding in ["utf-16-le", "utf-8", "cp1252"]:
+    """Read text files robustly, including UTF-16 Windows logs."""
+    encodings = (
+        "utf-16",
+        "utf-8-sig",
+        "utf-8",
+        "cp1252",
+    )
+
+    for encoding in encodings:
         try:
-            return path.read_text(encoding=encoding, errors="replace")
-        except Exception:
+            text = path.read_text(encoding=encoding)
+            if text:
+                return text
+        except (UnicodeDecodeError, OSError):
             continue
+
     return None
 
 
@@ -36,8 +39,25 @@ def _safe_read_text(path: Path) -> Optional[str]:
 def load_stream_metrics() -> Optional[pd.DataFrame]:
     for path in METRICS_PATHS:
         if path.exists():
-            return pd.read_csv(path)
+            try:
+                df = pd.read_csv(path)
+                required = {"chunk", "accuracy", "precision", "recall", "f1"}
+                if required.issubset(df.columns):
+                    return df.sort_values("chunk").reset_index(drop=True)
+            except Exception:
+                continue
     return None
+
+
+@st.cache_data(show_spinner=False)
+def load_comparison_results() -> Optional[pd.DataFrame]:
+    path = BASELINES_DIR / "final_comparison.csv"
+    if not path.exists():
+        return None
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return None
 
 
 @st.cache_data(show_spinner=False)
@@ -45,27 +65,38 @@ def load_prediction_explanations() -> Optional[Dict[str, Any]]:
     path = EXPLAIN_DIR / "prediction_explanations.json"
     if not path.exists():
         return None
-    with open(path, "r", encoding="utf-8") as fp:
-        return json.load(fp)
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def load_latent_mapping() -> Optional[List[Dict[str, Any]]]:
+    path = EXPLAIN_DIR / "latent_feature_mapping.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else data.get("mapping", [])
+    except Exception:
+        return None
 
 
 @st.cache_data(show_spinner=False)
 def load_shap_assets() -> Dict[str, Optional[str]]:
-    return {
-        "summary": str(SHAP_FILES["summary"]) if SHAP_FILES["summary"].exists() else None,
-        "importance": str(SHAP_FILES["importance"]) if SHAP_FILES["importance"].exists() else None,
+    files = {
+        "summary": EXPLAIN_DIR / "shap_summary.png",
+        "importance": EXPLAIN_DIR / "global_feature_importance.png",
     }
+    return {k: str(v) if v.exists() else None for k, v in files.items()}
 
 
 @st.cache_data(show_spinner=False)
 def load_waterfall_files() -> List[str]:
     if not EXPLAIN_DIR.exists():
         return []
-    return sorted(
-        str(path)
-        for ext in ["*.png", "*.html"]
-        for path in EXPLAIN_DIR.glob(ext)
-    )
+    return sorted(str(p) for p in EXPLAIN_DIR.glob("waterfall_*.png"))
 
 
 @st.cache_data(show_spinner=False)
@@ -77,52 +108,77 @@ def load_log_text() -> Optional[str]:
     return None
 
 
-def _parse_int(match: Optional[re.Match]) -> Optional[int]:
-    if match:
-        return int(match.group(1).replace(",", ""))
-    return None
-
-
-def _parse_float(match: Optional[re.Match]) -> Optional[float]:
-    if match:
-        return float(match.group(1))
+def _number(text: str, patterns: List[str], integer: bool = False) -> Optional[float]:
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            raw = m.group(1).replace(",", "")
+            try:
+                return int(float(raw)) if integer else float(raw)
+            except ValueError:
+                pass
     return None
 
 
 @st.cache_data(show_spinner=False)
-def parse_summary_metrics() -> Dict[str, Optional[Any]]:
-    text = load_log_text()
-    if not text:
-        return {}
+def parse_summary_metrics() -> Dict[str, Any]:
+    metrics: Dict[str, Any] = {}
 
-    metrics: Dict[str, Optional[Any]] = {}
-    metrics["accuracy"] = _parse_float(re.search(r"Final Accuracy\s*:\s*([0-9.]+)", text))
-    metrics["precision"] = _parse_float(re.search(r"Final Precision\s*:\s*([0-9.]+)", text))
-    metrics["recall"] = _parse_float(re.search(r"Final Recall\s*:\s*([0-9.]+)", text))
-    metrics["f1"] = _parse_float(re.search(r"Final F1-Score\s*:\s*([0-9.]+)", text))
-    metrics["kappa"] = _parse_float(re.search(r"Kappa Score\s*:\s*([0-9.]+)", text))
-    metrics["drift_events"] = _parse_int(re.search(r"Drift Events\s*:\s*([0-9]+)", text))
-    metrics["retrain_count"] = _parse_int(re.search(r"Retrain count\s*:\s*([0-9]+)", text))
-    metrics["total_chunks"] = _parse_int(re.search(r"Total chunks\s*:\s*([0-9]+)", text))
-    metrics["stream_metrics_path"] = str(MODEL_DIR / "stream_metrics.csv") if (MODEL_DIR / "stream_metrics.csv").exists() else None
-    metrics["stream_samples"] = _parse_int(re.search(r"Stream samples\s*:\s*([0-9,]+)", text))
+    # First preference: persisted baseline evaluation for the Proposed IDS.
+    df = load_comparison_results()
+    if df is not None and not df.empty and "Model" in df.columns:
+        proposed = df[df["Model"].astype(str).str.strip().str.lower() == "proposed ids"]
+        if not proposed.empty:
+            row = proposed.iloc[0]
+            for key in ("Accuracy", "Precision", "Recall", "F1", "Kappa", "FAR", "DetectionRate"):
+                if key in row and pd.notna(row[key]):
+                    metrics[key.lower()] = float(row[key])
+
+    # Stream metrics are also reliable for stream/chunk counts.
+    stream = load_stream_metrics()
+    if stream is not None:
+        metrics["total_chunks"] = int(stream["chunk"].nunique())
+        metrics["last_chunk"] = int(stream["chunk"].max())
+
+    text = load_log_text() or ""
+
+    metrics["drift_events"] = _number(
+        text,
+        [r"Drift Events\s*:\s*([0-9]+)", r"Total Drift Events\s*:\s*([0-9]+)"],
+        integer=True,
+    )
+    metrics["retrain_count"] = _number(
+        text,
+        [r"Retrain count\s*:\s*([0-9]+)", r"Retraining Count\s*:\s*([0-9]+)"],
+        integer=True,
+    )
+    metrics["stream_samples"] = _number(
+        text,
+        [r"Stream samples\s*:\s*([0-9,]+)", r"Total stream samples\s*:\s*([0-9,]+)"],
+        integer=True,
+    )
+
+    explanations = load_prediction_explanations()
+    if explanations:
+        meta = explanations.get("metadata", {})
+        metrics.setdefault("stream_samples", meta.get("stream_samples"))
+        drift_chunks = meta.get("drift_chunks") or []
+        if metrics.get("drift_events") is None and drift_chunks:
+            metrics["drift_events"] = len(drift_chunks)
+        metrics["explained_samples"] = meta.get("explained_samples")
+
     return metrics
 
 
 @st.cache_data(show_spinner=False)
 def parse_phase_distribution() -> Dict[str, Any]:
-    text = load_log_text()
-    if not text:
-        return {}
-
+    text = load_log_text() or ""
     phase_pattern = re.compile(
-        r"Phase\s+\d+\s*:\s*([0-9,]+)\s*samples\s*\(normal=([0-9,]+).*?attack=([0-9,]+).*?%\)",
+        r"Phase\s+\d+\s*:\s*([0-9,]+)\s*samples\s*\(normal=([0-9,]+).*?attack=([0-9,]+)",
         re.IGNORECASE,
     )
-    phases: List[Dict[str, int]] = []
-    total_attack = 0
-    total_benign = 0
-    total_samples = 0
+    phases = []
+    total_attack = total_benign = total_samples = 0
     for match in phase_pattern.finditer(text):
         samples = int(match.group(1).replace(",", ""))
         normal = int(match.group(2).replace(",", ""))
@@ -131,34 +187,30 @@ def parse_phase_distribution() -> Dict[str, Any]:
         total_attack += attack
         total_benign += normal
         total_samples += samples
-
     return {
         "phases": phases,
-        "attack_samples": total_attack,
-        "benign_samples": total_benign,
-        "total_samples": total_samples,
+        "attack_samples": total_attack or None,
+        "benign_samples": total_benign or None,
+        "total_samples": total_samples or None,
     }
 
 
 def check_required_outputs() -> Tuple[bool, List[str]]:
-    missing: List[str] = []
-    if not load_stream_metrics() is not None:
-        missing.append("stream_metrics.csv")
-    if not (EXPLAIN_DIR / "prediction_explanations.json").exists():
-        missing.append("results/explainability/prediction_explanations.json")
-    if not (EXPLAIN_DIR / "shap_summary.png").exists():
-        missing.append("results/explainability/shap_summary.png")
-    if not (EXPLAIN_DIR / "global_feature_importance.png").exists():
-        missing.append("results/explainability/global_feature_importance.png")
-    return (len(missing) == 0, missing)
+    required = [
+        (load_stream_metrics() is not None, "stream_metrics.csv"),
+        ((EXPLAIN_DIR / "prediction_explanations.json").exists(), "prediction_explanations.json"),
+        ((EXPLAIN_DIR / "shap_summary.png").exists(), "shap_summary.png"),
+        ((EXPLAIN_DIR / "global_feature_importance.png").exists(), "global_feature_importance.png"),
+    ]
+    missing = [name for ok, name in required if not ok]
+    return not missing, missing
 
 
 def get_drift_chunks() -> List[int]:
     explanations = load_prediction_explanations()
-    if explanations and "metadata" in explanations:
-        return explanations["metadata"].get("drift_chunks", [])
-    text = load_log_text()
-    if not text:
-        return []
-    matches = re.findall(r"DRIFT @ chunk\s*([0-9]+)", text)
-    return [int(value) for value in matches]
+    if explanations:
+        chunks = explanations.get("metadata", {}).get("drift_chunks", [])
+        if chunks:
+            return [int(x) for x in chunks]
+    text = load_log_text() or ""
+    return [int(x) for x in re.findall(r"DRIFT\s*@\s*chunk\s*([0-9]+)", text, re.IGNORECASE)]

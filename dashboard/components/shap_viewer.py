@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -29,8 +30,28 @@ def render_sample_explanation(record: Dict[str, any], waterfall_files: List[str]
     st.markdown("#### Top Features")
     top_features = record.get("top_features", [])
     if top_features:
+        st.markdown("Hover over latent features to inspect their top original contributors.")
         for feature in top_features:
-            st.write(f"- {feature['display_name']} ({feature['feature']}) : {feature['shap_value']:+.4f} — {feature['impact']}")
+            tooltip = None
+            if feature.get("original_features"):
+                tooltip = ", ".join(
+                    f"{item['feature']} ({item['importance']:.2f})"
+                    for item in feature["original_features"]
+                )
+            if tooltip:
+                html_line = (
+                    f"<span title=\"{escape(tooltip, quote=True)}\">"
+                    f"{escape(feature['display_name'])} ({escape(feature['feature'])})"
+                    f"</span>"
+                )
+                st.markdown(
+                    f"- {html_line} : {feature['shap_value']:+.4f} — {escape(feature['impact'])}",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.write(
+                    f"- {feature['display_name']} ({feature['feature']}) : {feature['shap_value']:+.4f} — {feature['impact']}"
+                )
     else:
         st.write("No top features available.")
 

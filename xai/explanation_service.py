@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -18,6 +19,9 @@ from models.ensemble_wrapper import EnsemblePredictor
 from preprocessing.feature_names import display_name, resolve_feature_names
 from xai.shap_explainer import ShapExplainer
 from xai.visualization import ExplanationVisualizer, close_all_figures
+from xai.feature_projection import FeatureProjection
+
+LATENT_MAPPING_FILENAME = "latent_feature_mapping.json"
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,7 @@ class ExplanationService:
         top_k_features: int = 5,
         save_plots_on_explain: bool = False,
         max_visualization_files: int = MAX_VISUALIZATION_FILES,
+        latent_feature_mapping: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> None:
         self.predictor = EnsemblePredictor(ensemble)
         self.background_data = np.asarray(background_data, dtype=np.float64)
@@ -64,12 +69,21 @@ class ExplanationService:
         self.max_visualization_files = max_visualization_files
         self._vis_files_saved = 0
         self._visualization_paths: List[str] = []
+        self.latent_feature_mapping = list(latent_feature_mapping) if latent_feature_mapping else []
+        if self.latent_feature_mapping and len(self.latent_feature_mapping) == n_features:
+            display_names = [item.get("display_label", item.get("latent_feature", f"Latent {i:02d}"))
+                             for i, item in enumerate(self.latent_feature_mapping)]
+            self.feature_names = display_names
+        self._latent_mapping_by_index = self._build_latent_mapping_index()
 
         explainable = self.predictor.explainable_model
         self.shap_explainer = ShapExplainer(
             model=explainable,
             background_data=self.background_data,
             feature_names=self.feature_names,
+        )
+        self.feature_projection = FeatureProjection(
+            mapping_file="results/explainability/latent_feature_mapping.json"
         )
         self.visualizer = ExplanationVisualizer(output_dir=self.output_dir)
         self._global_plots_generated = False
@@ -86,9 +100,14 @@ class ExplanationService:
 
     def _cleanup_stale_artifacts(self) -> None:
         """Remove prior explainability artifacts before a fresh run."""
+        preserve = {LATENT_MAPPING_FILENAME}
         for name in os.listdir(self.output_dir):
             path = os.path.join(self.output_dir, name)
-            if os.path.isfile(path) and name.endswith((".png", ".html", ".jsonl", ".json")):
+            if (
+                os.path.isfile(path)
+                and name not in preserve
+                and name.endswith((".png", ".html", ".jsonl", ".json"))
+            ):
                 os.remove(path)
 
     def generate_explanation(
@@ -104,6 +123,7 @@ class ExplanationService:
         Produce a full explanation for one fused feature vector.
         """
         X = np.asarray(sample, dtype=np.float64).reshape(1, -1)
+        print("Explanation input shape:", X.shape)
         pred, confidence = self.predictor.predict_with_confidence(X)
         class_id = int(pred[0])
         conf = float(confidence[0])
@@ -282,6 +302,7 @@ class ExplanationService:
                 "visualization_files": list(self._visualization_paths),
                 "visualization_file_count": self._vis_files_saved,
                 "visualization_file_limit": self.max_visualization_files,
+                "latent_feature_mapping": self.latent_feature_mapping,
             },
             "explanations": explanations,
         }
@@ -321,17 +342,25 @@ class ExplanationService:
             name: float(val) for name, val in zip(self.feature_names, contributions)
         }
 
+        # Project latent SHAP values back to original features
+        projected_scores = self.feature_projection.project(contributions)
+        normalized_scores = self.feature_projection.normalize(projected_scores)
+        projected_top_features = self.feature_projection.rank(
+        normalized_scores,
+        top_k=5,
+)
+
         label = self.predictor.label_name(class_id)
         display = self.predictor.label_display(class_id)
         narrative_label = attack_type_label or label
 
         human = self._build_human_readable(
-            predicted_label=label,
-            display_label=display,
-            narrative_label=narrative_label,
-            confidence=confidence,
-            top_features=top_features,
-            is_malicious=(class_id == 0),
+         predicted_label=label,
+         display_label=display,
+         narrative_label=narrative_label,
+         confidence=confidence,
+         top_features=top_features,
+        is_malicious=(class_id == 0),
         )
 
         plot_paths: Dict[str, str] = {}
@@ -373,12 +402,19 @@ class ExplanationService:
             "prediction_class_id": class_id,
             "confidence": round(confidence, 4),
             "top_features": top_features,
+            "projected_original_features": [
+               {
+                   "feature": feature,
+                "normalized_importance": score
+                }
+                 for feature, score in projected_top_features
+            ],
             "feature_contributions": feat_contrib,
             "shap_values": dict(feat_contrib),
             "shap_base_value": float(base_value),
             "human_readable_explanation": human,
             "model_explained": "RandomForest",
-            "feature_space": "fused_latent_32d",
+            "feature_space": "latent_32d_with_original_projection",
             "plots": plot_paths,
         }
         return result
@@ -454,6 +490,27 @@ class ExplanationService:
 
         return plan
 
+    def _build_latent_mapping_index(self) -> Dict[int, Dict[str, Any]]:
+        mapping: Dict[int, Dict[str, Any]] = {}
+        for item in self.latent_feature_mapping:
+            latent_name = item.get("latent_feature", "")
+            try:
+                index = int(latent_name.replace("Latent ", ""))
+            except ValueError:
+                continue
+            mapping[index] = item
+        return mapping
+
+    def _latent_feature_index(self, name: str) -> Optional[int]:
+        if not name:
+            return None
+        prefix = name.split("(")[0].strip()
+        if prefix.lower().startswith("latent"):
+            parts = prefix.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                return int(parts[1])
+        return None
+
     def _top_features(
         self, sample: np.ndarray, contributions: np.ndarray
     ) -> List[Dict[str, Any]]:
@@ -464,6 +521,13 @@ class ExplanationService:
             shap_val = float(contributions[idx])
             raw_val = float(sample[idx])
             direction = "increased" if shap_val > 0 else "decreased"
+            latent_idx = self._latent_feature_index(name)
+            original_features = []
+            if latent_idx is not None:
+                latent_meta = self._latent_mapping_by_index.get(latent_idx)
+                if latent_meta is not None:
+                    original_features = latent_meta.get("top_original_features", [])
+
             items.append(
                 {
                     "feature": name,
@@ -472,6 +536,7 @@ class ExplanationService:
                     "shap_value": round(shap_val, 6),
                     "direction": direction,
                     "impact": "supports predicted class" if shap_val > 0 else "opposes predicted class",
+                    "original_features": original_features,
                 }
             )
         return items

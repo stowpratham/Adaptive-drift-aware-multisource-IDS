@@ -57,3 +57,7 @@ def render() -> None:
             f"**Current stream composition:** {phase_stats['attack_samples']:,} attack records, "
             f"{phase_stats['benign_samples']:,} benign records."
         )
+
+
+if __name__ == "__main__":
+    render()
